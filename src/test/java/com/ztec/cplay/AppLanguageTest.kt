@@ -49,6 +49,18 @@ class AppLanguageTest {
         assertSame(context, AppLanguage.wrap(context))
     }
 
+    @Test fun legacyPreferenceMigratesOnceWithoutOverridingAndroidSettings() {
+        val prefs = context.getSharedPreferences("app_language", Context.MODE_PRIVATE)
+        prefs.edit().putString("language", "ar").commit()
+        assertEquals("ar", AppLanguage.selected(context))
+        val manager = context.getSystemService(LocaleManager::class.java)
+        manager.applicationLocales = LocaleList.getEmptyLocaleList()
+        assertEquals("", AppLanguage.selected(context))
+        prefs.edit().putBoolean("migrated", false).putString("language", "ar").commit()
+        manager.applicationLocales = LocaleList(Locale.ENGLISH)
+        assertEquals("en", AppLanguage.selected(context))
+    }
+
     @Test(expected = IllegalArgumentException::class) fun unsupportedLanguageIsRejected() {
         AppLanguage.save(context, "invalid")
     }

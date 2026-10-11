@@ -16,7 +16,16 @@ internal object AppLanguage {
 
     fun selected(context: Context): String {
         if (Build.VERSION.SDK_INT >= 33) {
-            val locales = context.getSystemService(LocaleManager::class.java).applicationLocales
+            val manager = context.getSystemService(LocaleManager::class.java)
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("migrated", false)) {
+                val previous = prefs.getString("language", "") ?: ""
+                if (manager.applicationLocales.isEmpty && previous in choices && previous.isNotEmpty()) {
+                    manager.applicationLocales = LocaleList(Locale.forLanguageTag(previous))
+                }
+                prefs.edit().putBoolean("migrated", true).remove("language").apply()
+            }
+            val locales = manager.applicationLocales
             return if (locales.isEmpty) "" else locales[0].language
         }
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -28,13 +37,18 @@ internal object AppLanguage {
         if (Build.VERSION.SDK_INT >= 33) {
             context.getSystemService(LocaleManager::class.java).applicationLocales =
                 if (language.isEmpty()) LocaleList.getEmptyLocaleList() else LocaleList(Locale.forLanguageTag(language))
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean("migrated", true).remove("language").apply()
         } else {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("language", language).apply()
         }
     }
 
     fun wrap(context: Context): Context {
-        if (Build.VERSION.SDK_INT >= 33) return context
+        if (Build.VERSION.SDK_INT >= 33) {
+            selected(context)
+            return context
+        }
         val language = selected(context)
         if (language.isEmpty()) return context
         val locale = Locale.forLanguageTag(language)
